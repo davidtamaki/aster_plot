@@ -3,15 +3,28 @@ looker.plugins.visualizations.add({
     font_size: {
       type: "string",
       label: "Font Size",
-      values: [{
-          "Large": "large"
-        },
-        {
-          "Small": "small"
-        }
+      values: [
+       { "Large": "large" },
+        { "Small": "small" }
       ],
       display: "radio",
       default: "large"
+    },
+    color: {
+      type: 'string',
+      label: 'Custom Color',
+      display: 'color',
+    },
+    diameter: {
+      type: "string",
+      label: "Diameter",
+      default: '100%',
+      placeholder: "100%"
+    },
+    keyword_search: {
+      type: "string",
+      label: "Enter Keyword to search for",
+      placeholder: "Power"
     }
   },
 
@@ -99,17 +112,21 @@ looker.plugins.visualizations.add({
     this.container.innerHTML = '' // clear container of previous vis so width & height is correct
     this.clearErrors(); // clear any errors from previous updates
 
-    // Throw some errors and exit if the shape of the data isn't what this chart needs
-    if (queryResponse.fields.dimensions.length == 0) {
-      this.addError({
-        title: "No Dimensions",
-        message: "This chart requires dimensions."
-      });
+    // ensure data fit - requires no pivots, exactly 1 dimension_like field, and exactly 2 measure_like fields
+    if (!handleErrors(this, queryResponse, { 
+      min_pivots: 0, max_pivots: 0, 
+      min_dimensions: 1, max_dimensions: 1, 
+      min_measures: 2, max_measures: 2})) {
       return;
-    }
+    } 
 
-    var width = 500,
-      height = 500,
+    var dimension = queryResponse.fields.dimension_like[0].name;
+    var measure1 = queryResponse.fields.measure_like[0].name, measure2 = queryResponse.fields.measure_like[1].name;
+    
+    console.log(data)
+
+    var width = element.clientWidth,
+      height = element.clientHeight,
       radius = Math.min(width, height) / 2,
       innerRadius = 0.3 * radius;
 
@@ -146,14 +163,14 @@ looker.plugins.visualizations.add({
 
 
     data.forEach(function(d) {
-      console.log(d)
-      d.id = d['aster_plot_custom_vis.id'].value;
+      // console.log(d)
+      // d.id = d['aster_plot_custom_vis.id'].value;
       // d.order = +d.order;
-      d.color = d['aster_plot_custom_vis.color'].value;
-      d.weight = +d['aster_plot_custom_vis.weight'].value;
-      d.score = +d['aster_plot_custom_vis.score'].value;
-      d.width = +d['aster_plot_custom_vis.weight'].value;
-      d.label = d['aster_plot_custom_vis.label'].value;
+      d.label = d[dimension].value;
+      d.color = d['aster_plot_custom_vis.color'].value; // handle in vis config tab
+      d.score = +d[measure1].value; // length of slice (circle is 100)
+      d.weight = +d[measure2].value; // angle of slice (width of slice)
+      d.width = +d[measure2].value; // angle of slice (width of slice)
     });
 
 
@@ -195,7 +212,36 @@ looker.plugins.visualizations.add({
       .text(Math.round(score));
 
 
-
+    // Helper functions
+    function handleErrors(vis, res, options) {
+      var check = function (group, noun, count, min, max) {
+          if (!vis.addError || !vis.clearErrors) {
+              return false;
+          }
+          if (count < min) {
+              vis.addError({
+                  title: "Not Enough " + noun + "s",
+                  message: "This visualization requires " + (min === max ? 'exactly' : 'at least') + " " + min + " " + noun.toLowerCase() + (min === 1 ? '' : 's') + ".",
+                  group: group
+              });
+              return false;
+          }
+          if (count > max) {
+              vis.addError({
+                  title: "Too Many " + noun + "s",
+                  message: "This visualization requires " + (min === max ? 'exactly' : 'no more than') + " " + max + " " + noun.toLowerCase() + (min === 1 ? '' : 's') + ".",
+                  group: group
+              });
+              return false;
+          }
+          vis.clearErrors(group);
+          return true;
+      };
+      var _a = res.fields, pivots = _a.pivots, dimensions = _a.dimensions, measures = _a.measure_like;
+      return (check('pivot-req', 'Pivot', pivots.length, options.min_pivots, options.max_pivots)
+          && check('dim-req', 'Dimension', dimensions.length, options.min_dimensions, options.max_dimensions)
+          && check('mes-req', 'Measure', measures.length, options.min_measures, options.max_measures));
+    }
 
     done()
   }
