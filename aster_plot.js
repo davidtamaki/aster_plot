@@ -1,25 +1,34 @@
 looker.plugins.visualizations.add({
   options: {
-    font_size: {
+    legend: {
       type: "string",
-      label: "Font Size",
+      label: "Legend",
       values: [
-       { "Large": "large" },
-        { "Small": "small" }
+        { "Left": "left" },
+        { "Right": "right" },
+        { "Off": "off"}
       ],
       display: "radio",
-      default: "large"
+      default: "off"
     },
     color_range: {
       type: "array",
       label: "Color Range",
       display: "colors"
     },
+    font_size: {
+      type: "number",
+      label: "Font Size",
+      display: "range",
+      min: 10,
+      max: 100,
+      default: 40
+    },
     radius: {
       type: "number",
       label: "Circle Radius",
-      default: 100,
-      placeholder: 100
+      placeholder: 100,
+      default: 100
     },
     keyword_search: {
       type: "string",
@@ -66,7 +75,6 @@ looker.plugins.visualizations.add({
     .aster-score { 
       line-height: 1;
       font-weight: bold;
-      font-size: 500%;
     }
 
     .d3-tip {
@@ -174,7 +182,7 @@ looker.plugins.visualizations.add({
     for (let i = 0; i < data.length; i++) {
       if (i >= color_length) {
         let j = Math.floor(i/color_length)
-        data[i].color = config.color_range[i-(j*color_length)];
+        data[i].color = config.color_range[i-(j*color_length)]; // loop through color array if there are too many series
       } else {
         data[i].color = config.color_range[i];
       }
@@ -207,13 +215,12 @@ looker.plugins.visualizations.add({
       }
     }
 
-    console.log(data)
-
     // affix score to centre of pie
     svg.append("svg:text")
       .attr("class", "aster-score")
       .attr("dy", ".35em")
       .attr("text-anchor", "middle") // text-align: right
+      .attr("font-size", config.font_size)
       .text(Math.round(score));
 
 
@@ -239,12 +246,19 @@ looker.plugins.visualizations.add({
       .attr("d", outlineArc);
 
     // legend
-    var legend = svg.append("g")
-      .attr("class","legend")
-      .attr("transform","translate(-" + width/2.2 + " ,-" + height/2.5 + ")")
-      .style("font-size","12px")
-      .call(d3legend)
-
+    if (config.legend == "left") {
+      var legend = svg.append("g")
+        .attr("class","legend")
+        .attr("transform","translate(-" + width/2.2 + " ,-" + height/2.5 + ")")
+        .style("font-size","12px")
+        .call(d3legend)
+    } else if (config.legend == "right") {
+      var legend = svg.append("g")
+        .attr("class","legend")
+        .attr("transform","translate(" + width/3.0 + " ,-" + height/2.5 + ")")
+        .style("font-size","12px")
+        .call(d3legend)
+    }
 
 
     // Helper functions
@@ -272,7 +286,7 @@ looker.plugins.visualizations.add({
           vis.clearErrors(group);
           return true;
       };
-      var _a = res.fields, pivots = _a.pivots, dimensions = _a.dimensions, measures = _a.measure_like;
+      var _a = res.fields, pivots = _a.pivots, dimensions = _a.dimension_like, measures = _a.measure_like;
       return (check('pivot-req', 'Pivot', pivots.length, options.min_pivots, options.max_pivots)
           && check('dim-req', 'Dimension', dimensions.length, options.min_dimensions, options.max_dimensions)
           && check('mes-req', 'Measure', measures.length, options.min_measures, options.max_measures));
@@ -303,7 +317,6 @@ looker.plugins.visualizations.add({
           })
 
         items = d3.entries(items).sort(function(a,b) { return a.value.pos-b.value.pos})
-
         
         li.selectAll("text")
             .data(items,function(d) { return d.key})
