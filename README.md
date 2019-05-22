@@ -2,9 +2,9 @@
 
 Aster plots are used to display two metrics per slice in a pie chart visualisation. Each pie slice has a length and width component. 
 
-The first measure, the length, is the value extending from the centre of the pie outwards to the edge (*0* is the centre and the radius is defaulted to *100*). This is the *score*.
+The first measure, the *length*, represents the **score** of each slice, is the value extending from the centre of the pie outwards to the edge (*0* is the centre and the outer circle length is defaulted to max value of all scores).
 
-The second measure, the *width*, represents the weight of each slice, which gets used to arrive at a weighted mean score of the length scores in the centre. This score can also be overriden by entering a custom keyword search to use a row level value's length in place of the weighted mean score. See example below.
+The second measure, the *width*, represents the **weight** of each slice, which gets used to arrive at a weighted mean score of the length scores in the centre. This score can also be overriden by entering a custom keyword search to use a row level value's length in place of the weighted mean score. See example below.
 
 This implementation for Looker was built based on the [Ben Best’s Aster Plot in D3 Block](http://bl.ocks.org/bbest/2de0e25d4840c68f2db1).
 
