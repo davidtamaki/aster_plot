@@ -27,9 +27,7 @@ looker.plugins.visualizations.add({
     },
     radius: {
       type: "number",
-      label: "Circle Radius",
-      placeholder: 100,
-      default: 100
+      label: "Circle Radius"
     },
     keyword_search: {
       type: "string",
@@ -137,7 +135,7 @@ looker.plugins.visualizations.add({
     } 
 
     var dimension = queryResponse.fields.dimension_like[0].name;
-    var measure1 = queryResponse.fields.measure_like[0].name, measure2 = queryResponse.fields.measure_like[1].name;
+    var measure_1_score = queryResponse.fields.measure_like[0].name, measure_2_weight = queryResponse.fields.measure_like[1].name;
 
     var width = element.clientWidth,
       height = element.clientHeight,
@@ -179,6 +177,7 @@ looker.plugins.visualizations.add({
       config.color_range = ["#9E0041", "#C32F4B", "#E1514B", "#F47245", "#FB9F59", "#FEC574", "#FAE38C", "#EAF195", "#C7E89E", "#9CD6A4", "#6CC4A4", "#4D9DB4", "#4776B4", "#5E4EA1"];
     }
 
+    var all_scores = [];
     var color_length = config.color_range.length;
     for (let i = 0; i < data.length; i++) {
       if (i >= color_length) {
@@ -188,9 +187,15 @@ looker.plugins.visualizations.add({
         data[i].color = config.color_range[i];
       }
       data[i].label = data[i][dimension].value; // dimension label
-      data[i].score = +data[i][measure1].value; // length of slice (circle radius default is 100)
-      data[i].weight = +data[i][measure2].value; // angle of slice (width of slice)
-      data[i].width = +data[i][measure2].value; // angle of slice (width of slice)      
+      data[i].score = +data[i][measure_1_score].value; // length of slice (circle radius default is 100)
+      data[i].weight = +data[i][measure_2_weight].value; // angle of slice (width of slice)
+      data[i].width = +data[i][measure_2_weight].value; // angle of slice (width of slice) 
+      all_scores.push(data[i][measure_1_score].value)    
+    }
+    
+    if (!config.radius) {
+      console.log('Radius not set. Defaulting to max score: ' + getMaxOfArray(all_scores))
+      config.radius = getMaxOfArray(all_scores)
     }
 
     // calculate the weighted mean score (value in centre of pie)
@@ -263,6 +268,12 @@ looker.plugins.visualizations.add({
 
 
     // Helper functions
+
+    function getMaxOfArray(numArray) {
+       return Math.max.apply(null, numArray);
+    }
+
+
     function handleErrors(vis, res, options) {
       var check = function (group, noun, count, min, max) {
           if (!vis.addError || !vis.clearErrors) {
