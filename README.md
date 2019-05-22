@@ -10,6 +10,7 @@ This implementation for Looker was built based on the [Ben Best’s Aster Plot i
 
 
 ## Example
+![Screenshot](https://github.com/davidtamaki/aster_plot/blob/master/screen-shots/aster_example.gif)
 
 
 ## Implementation Instructions
