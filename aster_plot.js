@@ -14,7 +14,8 @@ looker.plugins.visualizations.add({
     color_range: {
       type: "array",
       label: "Color Range",
-      display: "colors"
+      display: "colors",
+      default: ["#9E0041", "#C32F4B", "#E1514B", "#F47245", "#FB9F59", "#FEC574", "#FAE38C", "#EAF195", "#C7E89E", "#9CD6A4", "#6CC4A4", "#4D9DB4", "#4776B4", "#5E4EA1"]
     },
     font_size: {
       type: "number",
@@ -32,8 +33,8 @@ looker.plugins.visualizations.add({
     },
     keyword_search: {
       type: "string",
-      label: "Enter custom keyword to search for",
-      placeholder: "Power"
+      label: "Custom keyword to search for",
+      placeholder: "Enter row value to display score"
     }
   },
 
@@ -175,7 +176,7 @@ looker.plugins.visualizations.add({
     svg.call(tip);
 
     if (!config.color_range) {
-      config.color_range = ["#62bad4", "#a9c574", "#929292", "#9fdee0", "#1f3e5a", "#90c8ae", "#92818d", "#c5c6a6", "#82c2ca", "#cee0a0", "#928fb4", "#9fc190"];
+      config.color_range = ["#9E0041", "#C32F4B", "#E1514B", "#F47245", "#FB9F59", "#FEC574", "#FAE38C", "#EAF195", "#C7E89E", "#9CD6A4", "#6CC4A4", "#4D9DB4", "#4776B4", "#5E4EA1"];
     }
 
     var color_length = config.color_range.length;
@@ -316,8 +317,8 @@ looker.plugins.visualizations.add({
             }
           })
 
-        items = d3.entries(items).sort(function(a,b) { return a.value.pos-b.value.pos})
-        
+        items = d3.entries(items).sort(function(a,b) { return a.key-b.key}) // sort alphanumerically
+
         li.selectAll("text")
             .data(items,function(d) { return d.key})
             .call(function(d) { d.enter().append("text")})
