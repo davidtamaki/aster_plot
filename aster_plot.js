@@ -1,6 +1,8 @@
 looker.plugins.visualizations.add({
+  //plot and series (colors)
   options: {
     legend: {
+      section: "Data",
       type: "string",
       label: "Legend",
       values: [
@@ -12,12 +14,24 @@ looker.plugins.visualizations.add({
       default: "off"
     },
     color_range: {
+      section: "Format",
+      order: 1,
       type: "array",
       label: "Color Range",
       display: "colors",
       default: ["#9E0041", "#C32F4B", "#E1514B", "#F47245", "#FB9F59", "#FEC574", "#FAE38C", "#EAF195", "#C7E89E", "#9CD6A4", "#6CC4A4", "#4D9DB4", "#4776B4", "#5E4EA1"]
     },
+    inner_circle_color: {
+      section: "Format",
+      order: 2,
+      type: "string",
+      label: "Inner Circle",
+      display: "color",
+      default: "#ffffff"
+    },
     font_size: {
+      section: "Format",
+      order: 3,
       type: "number",
       label: "Font Size",
       display: "range",
@@ -26,13 +40,22 @@ looker.plugins.visualizations.add({
       default: 40
     },
     radius: {
+      section: "Data",
       type: "number",
       label: "Circle Radius"
     },
     keyword_search: {
+      section: "Data",
       type: "string",
       label: "Custom keyword to search for",
       placeholder: "Enter row value to display score"
+    },
+    chart_size: {
+      section: "Format",
+      order: 4,
+      type: "string",
+      label: "Chart Size",
+      default: '100%'
     }
   },
 
@@ -132,7 +155,7 @@ looker.plugins.visualizations.add({
       min_dimensions: 1, max_dimensions: 1, 
       min_measures: 2, max_measures: 2})) {
       return;
-    } 
+    }
 
     var dimension = queryResponse.fields.dimension_like[0].name;
     var measure_1_score = queryResponse.fields.measure_like[0].name, measure_2_weight = queryResponse.fields.measure_like[1].name;
@@ -142,7 +165,77 @@ looker.plugins.visualizations.add({
       radius = Math.min(width, height) / 2,
       innerRadius = 0.3 * radius;
 
+    // set custom chart size
+    if (!isNaN(parseFloat(config.chart_size))) {
+      var ratio = parseFloat(config.chart_size) / 100.0;
+      if (ratio > 2) {
+        radius = radius*2;
+      }
+      else if (ratio < 0.2) {
+        radius = radius*0.2
+      }
+      else {
+        radius = radius*ratio;
+      }
+    }
+
+    if (!config.color_range) {
+      config.color_range = ["#9E0041", "#C32F4B", "#E1514B", "#F47245", "#FB9F59", "#FEC574", "#FAE38C", "#EAF195", "#C7E89E", "#9CD6A4", "#6CC4A4", "#4D9DB4", "#4776B4", "#5E4EA1"];
+    }
+
+    var all_scores = [],
+      color_length = config.color_range.length,
+      dataset_tiny = {};
+    for (let i = 0; i < data.length; i++) {
+      if (i >= color_length) {
+        let j = Math.floor(i/color_length)
+        data[i].color = config.color_range[i-(j*color_length)]; // loop through color array if there are too many series
+      } else {
+        data[i].color = config.color_range[i];
+      }
+      data[i].label = data[i][dimension].value; // dimension label
+      data[i].score = +data[i][measure_1_score].value; // length of slice (circle radius default is 100)
+      data[i].weight = +data[i][measure_2_weight].value; // angle of slice (width of slice)
+      data[i].width = +data[i][measure_2_weight].value; // angle of slice (width of slice) 
+      data[i].rendered = data[i][measure_1_score].rendered; // used for tooltip and legened
+      all_scores.push(data[i][measure_1_score].value); // used to set max radius
+      dataset_tiny[data[i][dimension].value] = data[i][measure_1_score].rendered;
+    }
+    
+    if (!config.radius) {
+      console.log('Radius not set. Defaulting to max score: ' + getMaxOfArray(all_scores))
+      config.radius = getMaxOfArray(all_scores)
+    }
+
+    // calculate the weighted mean score (value in centre of pie)
+    if (!config.keyword_search) {
+      // console.log('Default weighted mean score')
+      var score =
+        Math.round(
+          data.reduce(function(a, b) {
+            //console.log('a:' + a + ', b.score: ' + b.score + ', b.weight: ' + b.weight);
+            return a + (b.score * b.weight);
+          }, 0) /
+          data.reduce(function(a, b) {
+            return a + b.weight;
+          }, 0)
+        );
+    } else {
+      // custom keyword option
+      for (let i = 0; i < data.length; i++) {
+        if (data[i].label.toLowerCase().includes(config.keyword_search.toLowerCase())) {
+          console.log(data[i].label + ' is used for centre score');
+          var score = data[i].rendered;
+          data.splice(i,1);
+          innerRadius =  Math.max((score/100) * (radius/2), 0.2 * radius); // reshape inner circle size
+          break;
+        }
+      }
+    }
+
     var pie = d3.layout.pie()
+      // .startAngle(-90 * Math.PI/180)
+      // .endAngle(-90 * Math.PI/180 + 2*Math.PI)
       .sort(null)
       .value(function(d) {
         return d.width;
@@ -152,7 +245,7 @@ looker.plugins.visualizations.add({
       .attr('class', 'd3-tip')
       .offset([0, 0])
       .html(function(d) {
-        return d.data.label + ": <span style='color:orangered'>" + d.data.score + "</span>";
+        return d.data.label + ": <span style='color:orangered'>" + d.data.rendered + "</span>";
       });
 
     var arc = d3.svg.arc()
@@ -173,53 +266,12 @@ looker.plugins.visualizations.add({
 
     svg.call(tip);
 
-    if (!config.color_range) {
-      config.color_range = ["#9E0041", "#C32F4B", "#E1514B", "#F47245", "#FB9F59", "#FEC574", "#FAE38C", "#EAF195", "#C7E89E", "#9CD6A4", "#6CC4A4", "#4D9DB4", "#4776B4", "#5E4EA1"];
-    }
-
-    var all_scores = [];
-    var color_length = config.color_range.length;
-    for (let i = 0; i < data.length; i++) {
-      if (i >= color_length) {
-        let j = Math.floor(i/color_length)
-        data[i].color = config.color_range[i-(j*color_length)]; // loop through color array if there are too many series
-      } else {
-        data[i].color = config.color_range[i];
-      }
-      data[i].label = data[i][dimension].value; // dimension label
-      data[i].score = +data[i][measure_1_score].value; // length of slice (circle radius default is 100)
-      data[i].weight = +data[i][measure_2_weight].value; // angle of slice (width of slice)
-      data[i].width = +data[i][measure_2_weight].value; // angle of slice (width of slice) 
-      all_scores.push(data[i][measure_1_score].value)    
-    }
-    
-    if (!config.radius) {
-      console.log('Radius not set. Defaulting to max score: ' + getMaxOfArray(all_scores))
-      config.radius = getMaxOfArray(all_scores)
-    }
-
-    // calculate the weighted mean score (value in centre of pie)
-    if (!config.keyword_search) {
-      var score =
-        data.reduce(function(a, b) {
-          console.log('Default weighted mean score')
-          //console.log('a:' + a + ', b.score: ' + b.score + ', b.weight: ' + b.weight);
-          return a + (b.score * b.weight);
-        }, 0) /
-        data.reduce(function(a, b) {
-          return a + b.weight;
-        }, 0);
-    } else {
-      // custom keyword option
-      for (let i = 0; i < data.length; i++) {
-        if (data[i].label.toLowerCase().includes(config.keyword_search.toLowerCase())) {
-          console.log(data[i].label + ' is used for centre score');
-          var score = data[i].score;
-          data.splice(i,1)
-          break;
-        }
-      }
-    }
+    // inner circle color
+    var inner_circle = svg.append("circle")
+      .attr("cx", 0)
+      .attr("cy", 0)
+      .attr("r", innerRadius)
+      .attr("fill",config.inner_circle_color);
 
     // affix score to centre of pie
     svg.append("svg:text")
@@ -227,21 +279,32 @@ looker.plugins.visualizations.add({
       .attr("dy", ".35em")
       .attr("text-anchor", "middle") // text-align: right
       .attr("font-size", config.font_size)
-      .text(Math.round(score));
-
+      .text(score);
 
     var path = svg.selectAll(".solidArc")
       .data(pie(data))
       .enter().append("path")
-      .attr("data-legend",function(d) { return d.data.label}) // legend
-      .attr("fill", function(d) {
-        return d.data.color;
-      })
+      .attr("data-legend",function(d) { return d.data.label }) // for legend
+      .attr("fill", function(d) { return d.data.color })
       .attr("class", "solidArc")
       .attr("stroke", "gray")
       .attr("d", arc)
+      .attr("id", function(d,i) { return "sliceArc_"+i; }) // Unique id for labels
       .on('mouseover', tip.show)
       .on('mouseout', tip.hide);
+
+    // labels - WIP
+    // svg.selectAll(".label")
+    //     .data(pie(data))
+    //     .enter().append("text")
+    //     .attr("class", "label")
+    //     .attr("x", 5) 
+    //     .attr("dy", 18)
+    //     .append("textPath")
+    //     .attr("startOffset","50%")
+    //     .style("text-anchor","middle")
+    //     .attr("xlink:href",function(d,i){return "#sliceArc_"+i })
+    //     .text(function(d){return d.data.label });
 
     var outerPath = svg.selectAll(".outlineArc")
       .data(pie(data))
@@ -324,11 +387,18 @@ looker.plugins.visualizations.add({
             var self = d3.select(this)
             items[self.attr("data-legend")] = {
               pos : self.attr("data-legend-pos") || this.getBBox().y,
-              color : self.attr("data-legend-color") != undefined ? self.attr("data-legend-color") : self.style("fill") != 'none' ? self.style("fill") : self.style("stroke") 
+              color : self.attr("data-legend-color") != undefined ? self.attr("data-legend-color") : self.style("fill") != 'none' ? self.style("fill") : self.style("stroke"),
+              rendered : '100' // testing adding values to legend
             }
           })
-
-        items = d3.entries(items).sort(function(a,b) { return a.key-b.key}) // sort alphanumerically
+        
+        // sort alphanumerically
+        items = d3.entries(items).sort(function(a,b) { return (a.key < b.key) ? -1 : (a.key > b.key) ? 1 : 0})
+        
+        // adding rendered values to legend
+        for (let i = 0; i < items.length; i++) {
+          items[i].value.rendered = dataset_tiny[items[i].key]
+        }
 
         li.selectAll("text")
             .data(items,function(d) { return d.key})
@@ -336,7 +406,7 @@ looker.plugins.visualizations.add({
             .call(function(d) { d.exit().remove()})
             .attr("y",function(d,i) { return i+"em"})
             .attr("x","1em")
-            .text(function(d) { ;return d.key})
+            .text(function(d) { return d.key + ' ' + d.value.rendered});
         
         li.selectAll("circle")
             .data(items,function(d) { return d.key})
@@ -345,10 +415,7 @@ looker.plugins.visualizations.add({
             .attr("cy",function(d,i) { return i-0.25+"em"})
             .attr("cx",0)
             .attr("r","0.4em")
-            .style("fill",function(d) { 
-              // console.log(d.value.color);
-              return d.value.color
-            })  
+            .style("fill",function(d) { return d.value.color});
         
         // Reposition and resize the box
         var lbbox = li[0][0].getBBox()  
