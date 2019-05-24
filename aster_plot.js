@@ -213,6 +213,8 @@ looker.plugins.visualizations.add({
     if (!config.radius) {
       console.log('Radius not set. Defaulting to max score: ' + getMaxOfArray(all_scores))
       config.radius = getMaxOfArray(all_scores)
+    } else {
+      console.log('Radius config set to: ' + config.radius)
     }
 
     // calculate the weighted mean score (value in centre of pie)
