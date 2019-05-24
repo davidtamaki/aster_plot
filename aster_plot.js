@@ -29,9 +29,17 @@ looker.plugins.visualizations.add({
       display: "color",
       default: "#ffffff"
     },
-    font_size: {
+    text_color: {
       section: "Format",
       order: 3,
+      type: "string",
+      label: "Text Color",
+      display: "color",
+      default: "#000000"
+    },
+    font_size: {
+      section: "Format",
+      order: 4,
       type: "number",
       label: "Font Size",
       display: "range",
@@ -278,6 +286,7 @@ looker.plugins.visualizations.add({
       .attr("class", "aster-score")
       .attr("dy", ".35em")
       .attr("text-anchor", "middle") // text-align: right
+      .style('fill', config.text_color)
       .attr("font-size", config.font_size)
       .text(score);
 
