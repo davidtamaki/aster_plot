@@ -180,7 +180,7 @@ looker.plugins.visualizations.add({
         radius = radius*2;
       }
       else if (ratio < 0.2) {
-        radius = radius*0.2
+        radius = radius*0.2;
       }
       else {
         radius = radius*ratio;
@@ -192,6 +192,7 @@ looker.plugins.visualizations.add({
     }
 
     var all_scores = [],
+      all_weight = [],
       color_length = config.color_range.length,
       dataset_tiny = {};
     for (let i = 0; i < data.length; i++) {
@@ -207,6 +208,7 @@ looker.plugins.visualizations.add({
       data[i].width = +data[i][measure_2_weight].value; // angle of slice (width of slice) 
       data[i].rendered = data[i][measure_1_score].rendered; // used for tooltip and legened
       all_scores.push(data[i][measure_1_score].value); // used to set max radius
+      all_weight.push(data[i][measure_2_weight].value); // used to set custom inner circle size
       dataset_tiny[data[i][dimension].value] = data[i][measure_1_score].rendered;
     }
     
@@ -235,9 +237,15 @@ looker.plugins.visualizations.add({
       for (let i = 0; i < data.length; i++) {
         if (data[i].label.toLowerCase().includes(config.keyword_search.toLowerCase())) {
           console.log(data[i].label + ' is used for centre score');
-          var score = data[i].rendered;
+          var score = data[i].weight,
+            min = Math.min( ...all_weight),
+            max = Math.max( ...all_weight),
+            scale_min = 0.2, // setting scale is 0.2 -> 0.6 of radius
+            scale_max = 0.6,
+            diff = max-min,
+            percentile = (score-min)/diff;
           data.splice(i,1);
-          innerRadius =  Math.max((score/100) * (radius/2), 0.2 * radius); // reshape inner circle size
+          innerRadius = ((percentile * 0.4) + scale_min) * radius; // reshape inner circle size based on weight
           break;
         }
       }
