@@ -13,6 +13,17 @@ looker.plugins.visualizations.add({
       display: "radio",
       default: "off"
     },
+    label_value: {
+      section: "Data",
+      type: "string",
+      label: "Data Labels",
+      values: [
+        {"On":"on"},
+        {"Off":"off"}
+        ],
+      display: "radio",
+      default: "off"
+    },
     color_range: {
       section: "Format",
       order: 1,
@@ -168,8 +179,17 @@ looker.plugins.visualizations.add({
     var dimension = queryResponse.fields.dimension_like[0].name;
     var measure_1_score = queryResponse.fields.measure_like[0].name, measure_2_weight = queryResponse.fields.measure_like[1].name;
 
-    var width = element.clientWidth,
-      height = element.clientHeight,
+    // SVG margins to make labels visible. Otherwise they overflow visible area
+    // src: https://www.visualcinnamon.com/2015/09/placing-text-on-arcs.html
+    var margin = {
+      top: 20,
+      right: 20,
+      bottom: 20,
+      left: 20
+    };
+
+    var width = element.clientWidth - margin.left - margin.right,
+      height = element.clientHeight - margin.top - margin.bottom,
       radius = Math.min(width, height) / 2,
       innerRadius = 0.3 * radius;
 
@@ -252,8 +272,11 @@ looker.plugins.visualizations.add({
     }
 
     var pie = d3.layout.pie()
-      // .startAngle(-90 * Math.PI/180)
-      // .endAngle(-90 * Math.PI/180 + 2*Math.PI)
+      // Turn the pie chart 90 degrees counter clockwise, so it starts at the left. We need this
+      // to properly handle labels flipping
+      // src: https://www.visualcinnamon.com/2015/09/placing-text-on-arcs.html
+      .startAngle(-90 * Math.PI/180)
+      .endAngle(-90 * Math.PI/180 + 2*Math.PI)
       .sort(null)
       .value(function(d) {
         return d.width;
@@ -277,10 +300,10 @@ looker.plugins.visualizations.add({
       .outerRadius(radius);
 
     var svg = d3.select(".d3-aster-plot").append("svg")
-      .attr("width", width)
-      .attr("height", height)
+      .attr("width", width + margin.left + margin.right)
+      .attr("height", height + margin.top + margin.bottom)
       .append("g")
-      .attr("transform", "translate(" + width / 2 + "," + height / 2 + ")");
+      .attr("transform", "translate(" + (width / 2 + margin.left) + "," + (height / 2 + margin.top) + ")");
 
     svg.call(tip);
 
@@ -308,30 +331,72 @@ looker.plugins.visualizations.add({
       .attr("class", "solidArc")
       .attr("stroke", "gray")
       .attr("d", arc)
-      .attr("id", function(d,i) { return "sliceArc_"+i; }) // Unique id for labels
       .on('mouseover', tip.show)
       .on('mouseout', tip.hide);
 
-    // labels - WIP
-    // svg.selectAll(".label")
-    //     .data(pie(data))
-    //     .enter().append("text")
-    //     .attr("class", "label")
-    //     .attr("x", 5) 
-    //     .attr("dy", 18)
-    //     .append("textPath")
-    //     .attr("startOffset","50%")
-    //     .style("text-anchor","middle")
-    //     .attr("xlink:href",function(d,i){return "#sliceArc_"+i })
-    //     .text(function(d){return d.data.label });
-
+    // Create the Ouline Arc and also the invisible arcs for labels
+    // src: https://www.visualcinnamon.com/2015/09/placing-text-on-arcs.html
     var outerPath = svg.selectAll(".outlineArc")
       .data(pie(data))
       .enter().append("path")
       .attr("fill", "none")
       .attr("stroke", "gray")
       .attr("class", "outlineArc")
-      .attr("d", outlineArc);
+      .attr("d", outlineArc)
+      // Create the new invisible arcs and flip the direction for the bottom half labels
+      .each(function(d, i) {
+          // Search pattern for everything between the start and the first capital L
+          var firstArcSection = /(^.+?)L/;
+
+          // Grab everything up to the first Line statement
+          var newArc = firstArcSection.exec( d3.select(this).attr("d") )[1];
+          // Replace all the commas so that IE can handle it
+          newArc = newArc.replace(/,/g , " ");
+
+          // If the end angle lies beyond a quarter of a circle (90 degrees or pi/2)
+          // flip the end and start position
+          if (d.endAngle > 90 * Math.PI/180) {
+              // Everything between the capital M and first capital A
+              var startLoc = /M(.*?)A/;
+              // Everything between the capital A and 0 0 1
+              var middleLoc = /A(.*?)0 0 1/;
+              // Everything between the 0 0 1 and the end of the string (denoted by $)
+              var endLoc = /0 0 1 (.*?)$/;
+              // Flip the direction of the arc by switching the start and end point
+              // and using a 0 (instead of 1) sweep flag
+              var newStart = endLoc.exec( newArc )[1];
+              var newEnd = startLoc.exec( newArc )[1];
+              var middleSec = middleLoc.exec( newArc )[1];
+
+              // Build up the new arc notation, set the sweep-flag to 0
+              newArc = "M" + newStart + "A" + middleSec + "0 0 0 " + newEnd;
+          }
+
+          // Create a new invisible arc that the label can flow along
+          svg.append("path")
+              .attr("class", "hiddenDonutArcs")
+              .attr("id", "sliceOutlineArc_"+i)
+              .attr("d", newArc)
+              .style("fill", "none");
+      });
+
+    if (config.label_value == "on") {
+      // Create labels
+      // src: https://www.visualcinnamon.com/2015/09/placing-text-on-arcs.html
+      svg.selectAll(".label")
+        .data(pie(data))
+        .enter().append("text")
+        .attr("class", "label")
+        // Move the labels below the arcs for slices with an end angle > than 90 degrees
+        .attr("dy", function(d,i) {
+            return (d.endAngle > 90 * Math.PI/180 ? 18 : -11);
+        })
+        .append("textPath")
+        .attr("startOffset","50%")
+        .style("text-anchor","middle")
+        .attr("xlink:href", function(d, i) { return "#sliceOutlineArc_"+i; })
+        .text(function(d) { return d.data.label; });
+    }
 
     // legend
     if (config.legend == "left") {
