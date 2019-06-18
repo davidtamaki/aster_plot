@@ -353,9 +353,23 @@ looker.plugins.visualizations.add({
           // Replace all the commas so that IE can handle it
           newArc = newArc.replace(/,/g , " ");
 
-          // If the end angle lies beyond a quarter of a circle (90 degrees or pi/2)
-          // flip the end and start position
-          if (d.endAngle > 90 * Math.PI/180) {
+          // Flip the end and start position
+          //
+          // We do not flip slices that more than 180 to not think about condition of how to flip
+          // them. Custom condition is required because > 180 slices have "large-arc-flag" set to 1,
+          // but we handle only case when it's set to 0 (Look at "0 0 1")
+          //
+          // Duplicates the condition in "dy" section of labels
+          if (
+            // End angle lies beyond a quarter of a circle (90 degrees or pi/2)
+            d.endAngle > 90 * Math.PI/180 &&
+            // Slice "length" is less than 180 degrees
+            (d.endAngle - d.startAngle) * 180 / Math.PI < 180
+          ) {
+              // Arc path
+              // Template: M start-x, start-y A radius-x, radius-y, x-axis-rotation, large-arc-flag, sweep-flag, end-x, end-y
+              // Example: M 0 300 A 200 200 0 0 1 400 300
+
               // Everything between the capital M and first capital A
               var startLoc = /M(.*?)A/;
               // Everything between the capital A and 0 0 1
@@ -387,9 +401,15 @@ looker.plugins.visualizations.add({
         .data(pie(data))
         .enter().append("text")
         .attr("class", "label")
-        // Move the labels below the arcs for slices with an end angle > than 90 degrees
+        // Move the labels below the arcs
         .attr("dy", function(d,i) {
-            return (d.endAngle > 90 * Math.PI/180 ? 18 : -11);
+            return (
+              // Duplicates the condition in ".each" section of the Outline Arc
+              d.endAngle > 90 * Math.PI/180 &&
+              (d.endAngle - d.startAngle) * 180 / Math.PI < 180
+                ? 18
+                : -11
+            );
         })
         .append("textPath")
         .attr("startOffset","50%")
