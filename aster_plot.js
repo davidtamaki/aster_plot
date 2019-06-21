@@ -82,7 +82,7 @@ looker.plugins.visualizations.add({
   create: function(element, config) {
 
     var css = `
-      <style> 
+      <style>
         body {
       font: 10px sans-serif;
     }
@@ -113,7 +113,7 @@ looker.plugins.visualizations.add({
       display: none;
     }
 
-    .aster-score { 
+    .aster-score {
       line-height: 1;
       font-weight: bold;
     }
@@ -169,9 +169,9 @@ looker.plugins.visualizations.add({
     this.clearErrors(); // clear any errors from previous updates
 
     // ensure data fit - requires no pivots, exactly 1 dimension_like field, and exactly 2 measure_like fields
-    if (!handleErrors(this, queryResponse, { 
-      min_pivots: 0, max_pivots: 0, 
-      min_dimensions: 1, max_dimensions: 1, 
+    if (!handleErrors(this, queryResponse, {
+      min_pivots: 0, max_pivots: 0,
+      min_dimensions: 1, max_dimensions: 1,
       min_measures: 2, max_measures: 2})) {
       return;
     }
@@ -182,10 +182,10 @@ looker.plugins.visualizations.add({
     // SVG margins to make labels visible. Otherwise they overflow visible area
     // src: https://www.visualcinnamon.com/2015/09/placing-text-on-arcs.html
     var margin = {
-      top: 20,
-      right: 20,
-      bottom: 20,
-      left: 20
+      top: 30,
+      right: 30,
+      bottom: 30,
+      left: 30
     };
 
     var width = element.clientWidth - margin.left - margin.right,
@@ -225,13 +225,13 @@ looker.plugins.visualizations.add({
       data[i].label = data[i][dimension].value; // dimension label
       data[i].score = +data[i][measure_1_score].value; // length of slice (circle radius default is 100)
       data[i].weight = +data[i][measure_2_weight].value; // angle of slice (width of slice)
-      data[i].width = +data[i][measure_2_weight].value; // angle of slice (width of slice) 
+      data[i].width = +data[i][measure_2_weight].value; // angle of slice (width of slice)
       data[i].rendered = data[i][measure_1_score].rendered; // used for tooltip and legened
       all_scores.push(data[i][measure_1_score].value); // used to set max radius
       all_weight.push(data[i][measure_2_weight].value); // used to set custom inner circle size
       dataset_tiny[data[i][dimension].value] = data[i][measure_1_score].rendered;
     }
-    
+
     if (!config.radius) {
       console.log('Radius not set. Defaulting to max score: ' + getMaxOfArray(all_scores))
       config.radius = getMaxOfArray(all_scores)
@@ -272,11 +272,6 @@ looker.plugins.visualizations.add({
     }
 
     var pie = d3.layout.pie()
-      // Turn the pie chart 90 degrees counter clockwise, so it starts at the left. We need this
-      // to properly handle labels flipping
-      // src: https://www.visualcinnamon.com/2015/09/placing-text-on-arcs.html
-      .startAngle(-90 * Math.PI/180)
-      .endAngle(-90 * Math.PI/180 + 2*Math.PI)
       .sort(null)
       .value(function(d) {
         return d.width;
@@ -353,19 +348,7 @@ looker.plugins.visualizations.add({
           // Replace all the commas so that IE can handle it
           newArc = newArc.replace(/,/g , " ");
 
-          // Flip the end and start position
-          //
-          // We do not flip slices that more than 180 to not think about condition of how to flip
-          // them. Custom condition is required because > 180 slices have "large-arc-flag" set to 1,
-          // but we handle only case when it's set to 0 (Look at "0 0 1")
-          //
-          // Duplicates the condition in "dy" section of labels
-          if (
-            // End angle lies beyond a quarter of a circle (90 degrees or pi/2)
-            d.endAngle > 90 * Math.PI/180 &&
-            // Slice "length" is less than 180 degrees
-            (d.endAngle - d.startAngle) * 180 / Math.PI < 180
-          ) {
+          if (shouldFlipLabel(d.startAngle, d.endAngle)) {
               // Arc path
               // Template: M start-x, start-y A radius-x, radius-y, x-axis-rotation, large-arc-flag, sweep-flag, end-x, end-y
               // Example: M 0 300 A 200 200 0 0 1 400 300
@@ -397,25 +380,42 @@ looker.plugins.visualizations.add({
     if (config.label_value == "on") {
       // Create labels
       // src: https://www.visualcinnamon.com/2015/09/placing-text-on-arcs.html
-      svg.selectAll(".label")
+
+      // Line 1
+      svg.selectAll(".label-line-1")
         .data(pie(data))
-        .enter().append("text")
-        .attr("class", "label")
+        .enter()
+        .append("text")
+        .attr("class", "label-line-1")
         // Move the labels below the arcs
         .attr("dy", function(d,i) {
-            return (
-              // Duplicates the condition in ".each" section of the Outline Arc
-              d.endAngle > 90 * Math.PI/180 &&
-              (d.endAngle - d.startAngle) * 180 / Math.PI < 180
-                ? 18
-                : -11
-            );
+          return shouldFlipLabel(d.startAngle, d.endAngle)
+            ? 18
+            : -21
         })
         .append("textPath")
         .attr("startOffset","50%")
         .style("text-anchor","middle")
         .attr("xlink:href", function(d, i) { return "#sliceOutlineArc_"+i; })
         .text(function(d) { return d.data.label; });
+
+      // Line 2
+      svg.selectAll(".label-line-2")
+        .data(pie(data))
+        .enter()
+        .append("text")
+        .attr("class", "label-line-2")
+        // Move the labels below the arcs
+        .attr("dy", function(d,i) {
+          return shouldFlipLabel(d.startAngle, d.endAngle)
+            ? 28
+            : -11
+        })
+        .append("textPath")
+        .attr("startOffset","50%")
+        .style("text-anchor","middle")
+        .attr("xlink:href", function(d, i) { return "#sliceOutlineArc_"+i; })
+        .text(function(d) { return d.data.rendered; });
     }
 
     // legend
@@ -435,6 +435,25 @@ looker.plugins.visualizations.add({
 
 
     // Helper functions
+
+    // Flip the end and start position
+    //
+    // We do not flip slices that more than 180 to not think about condition of how to flip
+    // them. Custom condition is required because > 180 slices have "large-arc-flag" set to 1,
+    // but we handle only case when it's set to 0 (Look at "0 0 1")
+    function shouldFlipLabel(startAngle, endAngle) {
+      return (
+        // End angle lies beyond a quarter of a circle (90 degrees or pi/2)
+        radiansToDegrees(endAngle) > 90 &&
+        radiansToDegrees(endAngle) < 270 &&
+        // Slice "length" is less than 180 degrees
+        radiansToDegrees(endAngle - startAngle) < 180
+      );
+    }
+
+    function radiansToDegrees(ragiansAngle) {
+      return ragiansAngle * 180 / Math.PI;
+    }
 
     function getMaxOfArray(numArray) {
        return Math.max.apply(null, numArray);
@@ -495,10 +514,10 @@ looker.plugins.visualizations.add({
               rendered : '100' // testing adding values to legend
             }
           })
-        
+
         // sort alphanumerically
         items = d3.entries(items).sort(function(a,b) { return (a.key < b.key) ? -1 : (a.key > b.key) ? 1 : 0})
-        
+
         // adding rendered values to legend
         for (let i = 0; i < items.length; i++) {
           items[i].value.rendered = dataset_tiny[items[i].key]
@@ -511,7 +530,7 @@ looker.plugins.visualizations.add({
             .attr("y",function(d,i) { return i+"em"})
             .attr("x","1em")
             .text(function(d) { return d.key + ' ' + d.value.rendered});
-        
+
         li.selectAll("circle")
             .data(items,function(d) { return d.key})
             .call(function(d) { d.enter().append("circle")})
@@ -520,9 +539,9 @@ looker.plugins.visualizations.add({
             .attr("cx",0)
             .attr("r","0.4em")
             .style("fill",function(d) { return d.value.color});
-        
+
         // Reposition and resize the box
-        var lbbox = li[0][0].getBBox()  
+        var lbbox = li[0][0].getBBox()
         lb.attr("x",(lbbox.x-legendPadding))
             .attr("y",(lbbox.y-legendPadding))
             .attr("height",(lbbox.height+2*legendPadding))
