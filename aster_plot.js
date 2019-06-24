@@ -1,8 +1,34 @@
 looker.plugins.visualizations.add({
   //plot and series (colors)
   options: {
+    radius: {
+      section: "Data",
+      order: 1,
+      type: "number",
+      label: "Circle Radius"
+    },
+    keyword_search: {
+      section: "Data",
+      order: 2,
+      type: "string",
+      label: "Custom keyword to search for",
+      placeholder: "Enter row value to display score"
+    },
+    label_value: {
+      section: "Data",
+      order: 3,
+      type: "string",
+      label: "Data Labels",
+      values: [
+        {"On":"on"},
+        {"Off":"off"}
+        ],
+      display: "radio",
+      default: "off"
+    },
     legend: {
       section: "Data",
+      order: 4,
       type: "string",
       label: "Legend",
       values: [
@@ -10,17 +36,6 @@ looker.plugins.visualizations.add({
         { "Right": "right" },
         { "Off": "off"}
       ],
-      display: "radio",
-      default: "off"
-    },
-    label_value: {
-      section: "Data",
-      type: "string",
-      label: "Data Labels",
-      values: [
-        {"On":"on"},
-        {"Off":"off"}
-        ],
       display: "radio",
       default: "off"
     },
@@ -32,49 +47,38 @@ looker.plugins.visualizations.add({
       display: "colors",
       default: ["#9E0041", "#C32F4B", "#E1514B", "#F47245", "#FB9F59", "#FEC574", "#FAE38C", "#EAF195", "#C7E89E", "#9CD6A4", "#6CC4A4", "#4D9DB4", "#4776B4", "#5E4EA1"]
     },
-    inner_circle_color: {
+    chart_size: {
       section: "Format",
       order: 2,
       type: "string",
-      label: "Inner Circle",
+      label: "Chart Size",
+      default: '100%'
+    },
+    inner_circle_color: {
+      section: "Inner Circle",
+      order: 1,
+      type: "string",
+      label: "Circle Color",
       display: "color",
       default: "#ffffff"
     },
     text_color: {
-      section: "Format",
-      order: 3,
+      section: "Inner Circle",
+      order: 2,
       type: "string",
       label: "Text Color",
       display: "color",
       default: "#000000"
     },
     font_size: {
-      section: "Format",
-      order: 4,
+      section: "Inner Circle",
+      order: 3,
       type: "number",
       label: "Font Size",
       display: "range",
       min: 10,
       max: 100,
       default: 40
-    },
-    radius: {
-      section: "Data",
-      type: "number",
-      label: "Circle Radius"
-    },
-    keyword_search: {
-      section: "Data",
-      type: "string",
-      label: "Custom keyword to search for",
-      placeholder: "Enter row value to display score"
-    },
-    chart_size: {
-      section: "Format",
-      order: 4,
-      type: "string",
-      label: "Chart Size",
-      default: '100%'
     }
   },
 
@@ -420,17 +424,9 @@ looker.plugins.visualizations.add({
 
     // legend
     if (config.legend == "left") {
-      var legend = svg.append("g")
-        .attr("class","legend")
-        .attr("transform","translate(-" + width/2.2 + " ,-" + height/2.5 + ")")
-        .style("font-size","12px")
-        .call(d3legend)
+      applyLegend(-width/2.2)
     } else if (config.legend == "right") {
-      var legend = svg.append("g")
-        .attr("class","legend")
-        .attr("transform","translate(" + width/3.0 + " ,-" + height/2.5 + ")")
-        .style("font-size","12px")
-        .call(d3legend)
+      applyLegend(width/3.0)
     }
 
 
@@ -458,7 +454,6 @@ looker.plugins.visualizations.add({
     function getMaxOfArray(numArray) {
        return Math.max.apply(null, numArray);
     }
-
 
     function handleErrors(vis, res, options) {
       var check = function (group, noun, count, min, max) {
@@ -490,6 +485,13 @@ looker.plugins.visualizations.add({
           && check('mes-req', 'Measure', measures.length, options.min_measures, options.max_measures));
     }
 
+    function applyLegend(horizontalScale) {
+      var legend = svg.append("g")
+        .attr("class","legend")
+        .attr("transform","translate(" + horizontalScale + " ,-" + height/2.5 + ")")
+        .style("font-size","12px")
+        .call(d3legend)
+    }
 
     // Legend
     // (C) 2012 ziggy.jonsson.nyc@gmail.com
@@ -549,7 +551,6 @@ looker.plugins.visualizations.add({
       })
       return g
     }
-
 
     done()
   }
